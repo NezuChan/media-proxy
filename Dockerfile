@@ -1,26 +1,23 @@
-FROM golang:1.26-alpine as build-stage
+FROM rust:1-alpine AS build-stage
+
+RUN apk add --no-cache musl-dev
 
 WORKDIR /tmp/build
 
-COPY . .
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
 
-# Install needed deps
-RUN apk add --no-cache libc-dev vips-dev gcc g++ make
+RUN cargo build --release --locked
 
-# Build the project
-RUN go build cmd/server/main.go
+FROM gcr.io/distroless/static-debian12:nonroot
 
-FROM alpine:3
-
-LABEL name "NezukoChan Image Proxy"
+LABEL name "NezukoChan Media Proxy"
 LABEL maintainer "KagChi"
 
 WORKDIR /app
 
-# Install needed deps
-RUN apk add --no-cache vips tini
+COPY --from=build-stage /tmp/build/target/release/media-proxy /app/media-proxy
 
-COPY --from=build-stage /tmp/build/main main
+EXPOSE 3000
 
-ENTRYPOINT ["tini", "--"]
-CMD ["/app/main"]
+ENTRYPOINT ["/app/media-proxy"]

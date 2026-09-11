@@ -2,63 +2,82 @@
 
 <img src="https://i.kagchi.my.id/nezuko.png" alt="Logo" width="200px" height="200px" style="border-radius:50%"/>
 
-# @nezuchan/image-proxy
+# @nezuchan/media-proxy
 
-**A fast Image proxy service, such as resizing written in go.**
+**A fast media proxy service that resizes images and streams audio, written in Rust.**
 
-[![GitHub](https://img.shields.io/github/license/nezuchan/cordis-brokers)](https://github.com/nezuchan/cordis-brokers/blob/main/LICENSE)
+[![GitHub](https://img.shields.io/github/license/nezuchan/media-proxy)](https://github.com/nezuchan/media-proxy/blob/main/LICENSE)
 [![Discord](https://discordapp.com/api/guilds/785715968608567297/embed.png)](https://nezu.my.id)
 
 </div>
 
-## Requirements
+## Overview
 
--   [libvips](https://github.com/libvips/libvips) 8.10+
--   C compatible compiler such as gcc 4.6+ or clang 3.0+
--   Go 1.20+
+`media-proxy` hides origin URLs behind an `aes-256-cbc` encrypted payload. Clients
+pass a hex-encoded, encrypted URL and the service fetches, transforms and returns
+the media. It can proxy **images** (resize + crop) and **audio** (byte-range
+passthrough).
 
-## Dependencies for govips
-
-### MacOS
-
-Use [homebrew](https://brew.sh/) to install vips and pkg-config:
-
-```bash
-brew install vips pkg-config
-```
-
-### Ubuntu
-
-You need a recent libvips to work with govips. New govips functionality is continuously added which takes advantage of new libvips functionality. Groovy (20.10) and Hirsute (21.04) repositories have working versions. However on Focal (20.04), you need to install libvips and dependencies from a backports repository:
-
-```bash
-sudo add-apt-repository -y ppa:strukturag/libde265
-sudo add-apt-repository -y ppa:strukturag/libheif
-sudo add-apt-repository ppa:tonimelisma/ppa
-```
-
-Then:
-
-```bash
-sudo apt -y install libvips-dev
-```
-
-### Windows
-
-The recommended approach on Windows is to use Govips via WSL and Ubuntu.
-
-If you need to run Govips natively on Windows, it's not difficult but will require some effort.
-
-### MacOS note
-
-On MacOS, govips may not compile without first setting an environment variable:
-
-```bash
-export CGO_CFLAGS_ALLOW="-Xpreprocessor"
-```
-
-
-# Features
-- Secure image routing, this service ideal when you are trying to hide origin request. using `aes-256-cbc` encryption for encrypting origin url
+- Pure Rust image pipeline (no libvips / native image dependencies)
+- Bounded in-memory cache for processed images
 - Docker ready
 - Production Ready
+
+## Requirements
+
+- Rust 1.75+ (stable)
+- No system libraries required — TLS uses `rustls`
+
+## Usage
+
+```bash
+cp .env_example .env
+cargo run --release
+```
+
+## Routes
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/health` | Liveness probe, returns `{"status":"ok"}` |
+| `GET` | `/image/:size/:media` | Resize/crop an image. `size` is `WxH`, `media` is hex(AES-CBC(url)). Returns `image/jpeg`. |
+| `GET` | `/audio/:media` | Stream audio. `media` is hex(AES-CBC(url)). Forwards `Range`/`206` and the upstream content type. |
+
+### Errors
+
+Errors use the original JSON shape:
+
+```json
+{ "statusCode": 400, "message": "invalid width size" }
+```
+
+## Configuration
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `KEY` | — | AES-256 key, exactly 32 bytes |
+| `IV` | — | AES-CBC IV, exactly 16 bytes |
+| `MAX_WIDTH` | `1024` | Maximum requested width |
+| `MAX_HEIGHT` | `1024` | Maximum requested height |
+| `IMAGE_QUALITY` | `100` | JPEG re-encode quality (1-100) |
+| `COMPRESS_IMAGE` | `false` | Route image origins through `wsrv.nl` |
+| `HOST` | `0.0.0.0` | Bind address |
+| `PORT` | `3000` | Bind port |
+| `CACHE_MAX_BYTES` | `67108864` | Image cache capacity (approx. bytes) |
+| `CACHE_TTL_SECS` | `300` | Image cache time-to-live |
+| `RUST_LOG` | `info` | Log filter directive |
+
+## Image behaviour
+
+- Decodes the origin bytes with the pure-Rust `image` crate.
+- Square images are scaled with a nearest-neighbour kernel.
+- Non-square images are coerced to a square box and centre-cropped
+  (approximating libvips `InterestingCentre`).
+- Output is always JPEG at `IMAGE_QUALITY`.
+
+## Docker
+
+```bash
+docker build -t media-proxy .
+docker run --env-file .env -p 3000:3000 media-proxy
+```
