@@ -15,4 +15,6 @@ on:
 jobs:
   docker:
     uses: nezuchan/workflows/.github/workflows/docker-build.yml@f1fd8acd1eb6ee76f944ab700ce7beafec5519c0 # main
+    with:
+      PLATFORMS: "linux/amd64"
     secrets: inherit
