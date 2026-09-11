@@ -18,6 +18,7 @@ impl AppState {
     pub fn new(config: Config) -> Result<Self, AppError> {
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
+            .user_agent(concat!("media-proxy/", env!("CARGO_PKG_VERSION")))
             .build()?;
 
         let cipher = Cipher::new(&config.key, &config.iv)?;

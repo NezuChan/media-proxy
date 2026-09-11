@@ -33,6 +33,7 @@ cbc = "0.1"
 hex = "0.4"
 
 bytes = "1"
+urlencoding = "2"
 moka = { version = "0.12", features = ["future"] }
 
 serde = { version = "1", features = ["derive"] }
