@@ -15,7 +15,6 @@ path = "src/main.rs"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["http1", "tokio"] }
-tower-http = { version = "0.6", features = ["trace"] }
 
 reqwest = { version = "0.12", features = ["stream", "rustls-tls"], default-features = false }
 
